@@ -19,9 +19,17 @@
 */
 
 #include "Viewer.h"
+
 #include <pangolin/pangolin.h>
 
+#include <opencv2/opencv.hpp>
+
 #include <mutex>
+#include <sstream>
+#include <fstream>
+#include <string>
+
+void writeToFile(std::ostringstream &) {}
 
 namespace ORB_SLAM2
 {
@@ -72,6 +80,7 @@ void Viewer::Run()
     pangolin::Var<bool> menuShowGraph("menu.Show Graph",true,true);
     pangolin::Var<bool> menuLocalizationMode("menu.Localization Mode",false,true);
     pangolin::Var<bool> menuReset("menu.Reset",false,false);
+    pangolin::Var<bool> menuSaveFrame("menu.SaveFrame",false,false);
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
@@ -151,6 +160,35 @@ void Viewer::Run()
             menuFollowCamera = true;
             mpSystem->Reset();
             menuReset = false;
+        }
+
+        // Save the latest keyframe
+        if (menuSaveFrame) {
+            cv::imwrite("frame.png", mpFrameDrawer->mIm);
+
+            menuSaveFrame = false;
+
+            // Write points to file
+            //
+            // Format: (u,v), (x,y,z)
+            std::ostringstream output;
+            for (size_t i = 0, max = mpFrameDrawer->mvCurrentKeys.size(); i < max; i++) {
+                // 3D points
+                if (mpSystem->lastFrame.mvpMapPoints[i] != nullptr) {
+                    // Keypoints
+                    output << mpFrameDrawer->mvCurrentKeys[i].pt.x << " " << mpFrameDrawer->mvCurrentKeys[i].pt.y << " ";
+
+                    // 3D points
+                    cv::Mat pos = mpSystem->lastFrame.mvpMapPoints[i]->GetWorldPos();
+                    output << pos.at<float>(0) << " " << pos.at<float>(1)  << " " << pos.at<float>(2);
+
+                    output << "\n";
+                }
+            }
+
+            std::cout << output.str();
+
+            // @todo: writeToFile();
         }
 
         if(Stop())

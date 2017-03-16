@@ -32,6 +32,7 @@
 
 #include"Optimizer.h"
 #include"PnPsolver.h"
+#include "../include/Tracking.h"
 
 #include<iostream>
 
@@ -199,6 +200,8 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
     mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
     Track();
+
+    mpSystem->lastFrame = Frame(mCurrentFrame);
 
     return mCurrentFrame.mTcw.clone();
 }

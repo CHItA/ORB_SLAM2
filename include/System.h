@@ -56,6 +56,8 @@ public:
         RGBD=2
     };
 
+    Frame lastFrame;
+
 public:
 
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
