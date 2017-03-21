@@ -172,6 +172,7 @@ void Viewer::Run()
             //
             // Format: (u,v), (x,y,z)
             std::ostringstream output;
+            output << mpSystem->lastFrame.mTcw << "\n";
             for (size_t i = 0, max = mpFrameDrawer->mvCurrentKeys.size(); i < max; i++) {
                 // 3D points
                 if (mpSystem->lastFrame.mvpMapPoints[i] != nullptr) {
