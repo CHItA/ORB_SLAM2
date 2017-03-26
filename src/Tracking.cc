@@ -459,7 +459,8 @@ void Tracking::Track()
             mlpTemporalPoints.clear();
 
             // Check if we need to insert a new keyframe
-            if(NeedNewKeyFrame())
+            bool keyframe = NeedNewKeyFrame();
+            if(keyframe)
                 CreateNewKeyFrame();
 
             // We allow points with high innovation (considererd outliers by the Huber Function)
@@ -471,6 +472,9 @@ void Tracking::Track()
                 if(mCurrentFrame.mvpMapPoints[i] && mCurrentFrame.mvbOutlier[i])
                     mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
             }
+
+            if (keyframe)
+                DispatchFrame();
         }
 
         // Reset if the camera get lost soon after initialization
@@ -1071,8 +1075,6 @@ void Tracking::CreateNewKeyFrame()
         return;
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
-    std::vector<Eigen::Vector2f> featurePoints;
-    std::vector<Eigen::Vector3f> pointPositions;
 
     mpReferenceKF = pKF;
     mCurrentFrame.mpReferenceKF = pKF;
@@ -1127,17 +1129,6 @@ void Tracking::CreateNewKeyFrame()
 
                     mCurrentFrame.mvpMapPoints[i]=pNewMP;
 
-                    featurePoints.push_back(Eigen::Vector2f(
-                        (float)mCurrentFrame.mvKeys[i].pt.x,
-                        (float)mCurrentFrame.mvKeys[i].pt.y
-                    ));
-
-                    pointPositions.push_back(Eigen::Vector3f(
-                        pNewMP->GetWorldPos().at<float>(0),
-                        pNewMP->GetWorldPos().at<float>(1),
-                        pNewMP->GetWorldPos().at<float>(2)
-                    ));
-
                     nPoints++;
                 }
                 else
@@ -1157,6 +1148,29 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+}
+
+void Tracking::DispatchFrame()
+{
+    std::vector<Eigen::Vector2f> featurePoints;
+    std::vector<Eigen::Vector3f> pointPositions;
+
+    for (size_t i = 0, total = mCurrentFrame.mvKeys.size(); i < total; i++) {
+        if (mCurrentFrame.mvpMapPoints[i] == nullptr || mCurrentFrame.mvpMapPoints[i]->nObs < 3) {
+            continue;
+        }
+
+        featurePoints.push_back(Eigen::Vector2f(
+            mCurrentFrame.mvKeys[i].pt.x,
+            mCurrentFrame.mvKeys[i].pt.y
+        ));
+
+        pointPositions.push_back(Eigen::Vector3f(
+            mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(0),
+            mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(1),
+            mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(2)
+        ));
+    }
 
     SurfaceExtractor::ORBFrame * line = new SurfaceExtractor::ORBFrame{
         mImGray,
