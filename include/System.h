@@ -25,6 +25,7 @@
 #include<string>
 #include<thread>
 #include<opencv2/core/core.hpp>
+#include <System/ORBSLAM/ORBSystem.h>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -79,6 +80,7 @@ public:
 
     // This stops local mapping thread (map building) and performs only camera tracking.
     void ActivateLocalizationMode();
+
     // This resumes local mapping thread and performs SLAM again.
     void DeactivateLocalizationMode();
 
@@ -122,7 +124,11 @@ public:
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
 
+    SurfaceExtractor::ORBSystem * getORBSystem() { return mpORBSystem; }
+
 private:
+
+    SurfaceExtractor::ORBSystem * mpORBSystem;
 
     // Input sensor
     eSensor mSensor;

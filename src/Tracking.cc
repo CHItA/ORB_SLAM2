@@ -23,6 +23,7 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
+#include <Eigen/Dense>
 
 #include"ORBmatcher.h"
 #include"FrameDrawer.h"
@@ -145,6 +146,10 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
         else
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
+
+    Eigen::Matrix3f proj;
+    proj << fx, 0, cx, 0, fy, cy, 0, 0, 1;
+    mpSystem->getORBSystem()->setProjectionMatrix(proj);
 
 }
 
@@ -1066,6 +1071,8 @@ void Tracking::CreateNewKeyFrame()
         return;
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
+    std::vector<Eigen::Vector2f> featurePoints;
+    std::vector<Eigen::Vector3f> pointPositions;
 
     mpReferenceKF = pKF;
     mCurrentFrame.mpReferenceKF = pKF;
@@ -1119,6 +1126,18 @@ void Tracking::CreateNewKeyFrame()
                     mpMap->AddMapPoint(pNewMP);
 
                     mCurrentFrame.mvpMapPoints[i]=pNewMP;
+
+                    featurePoints.push_back(Eigen::Vector2f(
+                        (float)mCurrentFrame.mvKeys[i].pt.x,
+                        (float)mCurrentFrame.mvKeys[i].pt.y
+                    ));
+
+                    pointPositions.push_back(Eigen::Vector3f(
+                        pNewMP->GetWorldPos().at<float>(0),
+                        pNewMP->GetWorldPos().at<float>(1),
+                        pNewMP->GetWorldPos().at<float>(2)
+                    ));
+
                     nPoints++;
                 }
                 else
@@ -1138,6 +1157,16 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+
+    SurfaceExtractor::ORBFrame * line = new SurfaceExtractor::ORBFrame{
+        mImGray,
+        featurePoints,
+        pointPositions,
+        mCurrentFrame.mRwc,
+        mCurrentFrame.mOw
+    };
+
+    mpSystem->getORBSystem()->push(line);
 }
 
 void Tracking::SearchLocalPoints()

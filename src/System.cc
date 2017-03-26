@@ -71,6 +71,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
     cout << "Vocabulary loaded!" << endl << endl;
 
+    mpORBSystem = new SurfaceExtractor::ORBSystem();
+
     //Create KeyFrame Database
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
@@ -314,6 +316,8 @@ void System::Shutdown()
     {
         usleep(5000);
     }
+
+    mpORBSystem->stop();
 
     if(mpViewer)
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");
