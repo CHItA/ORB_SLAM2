@@ -1156,7 +1156,7 @@ void Tracking::DispatchFrame()
     std::vector<Eigen::Vector3f> pointPositions;
 
     for (size_t i = 0, total = mCurrentFrame.mvKeys.size(); i < total; i++) {
-        if (mCurrentFrame.mvpMapPoints[i] == nullptr || mCurrentFrame.mvpMapPoints[i]->nObs < 3) {
+        if (mCurrentFrame.mvpMapPoints[i] == nullptr || mCurrentFrame.mvpMapPoints[i]->nObs < 4 || mCurrentFrame.mvpMapPoints[i]->isBad()) {
             continue;
         }
 
