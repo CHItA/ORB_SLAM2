@@ -88,6 +88,8 @@ void Viewer::Run()
     Twc.SetIdentity();
 
     cv::namedWindow("ORB-SLAM2: Current Frame");
+    cv::namedWindow("ORB-SLAM2: Current Keyframe");
+    cv::namedWindow("ORB-SLAM2: Previous Keyframe");
 
     bool bFollow = true;
     bool bLocalizationMode = false;
@@ -139,6 +141,14 @@ void Viewer::Run()
         cv::Mat im = mpFrameDrawer->DrawFrame();
         cv::imshow("ORB-SLAM2: Current Frame",im);
         cv::waitKey(mT);
+        
+		im = mpSystem->getORBSystem()->getImage();
+		cv::imshow("ORB-SLAM2: Current Keyframe",im);
+		cv::waitKey(mT);
+
+		im = mpSystem->getORBSystem()->getImage2();
+		cv::imshow("ORB-SLAM2: Previous Keyframe",im);
+		cv::waitKey(mT);
 
         if(menuReset)
         {

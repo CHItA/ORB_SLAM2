@@ -1154,12 +1154,13 @@ void Tracking::DispatchFrame()
 {
     std::vector<Eigen::Vector2f> featurePoints;
     std::vector<Eigen::Vector3f> pointPositions;
+	std::vector<long unsigned int> pointIds;
 
     for (size_t i = 0, total = mCurrentFrame.mvKeys.size(); i < total; i++) {
-        if (mCurrentFrame.mvpMapPoints[i] == nullptr || mCurrentFrame.mvpMapPoints[i]->nObs < 4 || mCurrentFrame.mvpMapPoints[i]->isBad()) {
+        if (mCurrentFrame.mvpMapPoints[i] == nullptr || mCurrentFrame.mvpMapPoints[i]->nObs < 3 || mCurrentFrame.mvpMapPoints[i]->isBad()) {
             continue;
         }
-
+        
         featurePoints.push_back(Eigen::Vector2f(
             mCurrentFrame.mvKeys[i].pt.x,
             mCurrentFrame.mvKeys[i].pt.y
@@ -1170,12 +1171,15 @@ void Tracking::DispatchFrame()
             mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(1),
             mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(2)
         ));
+        
+        pointIds.push_back(mCurrentFrame.mvpMapPoints[i]->mnId);
     }
 
     SurfaceExtractor::ORBFrame * line = new SurfaceExtractor::ORBFrame{
         mImGray,
         featurePoints,
         pointPositions,
+        pointIds,
         mCurrentFrame.mRwc,
         mCurrentFrame.mOw
     };
