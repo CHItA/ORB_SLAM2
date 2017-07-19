@@ -37,6 +37,10 @@
 
 #include<mutex>
 
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+
 
 using namespace std;
 
@@ -1138,6 +1142,7 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+    SavePointCloud();
 }
 
 void Tracking::SearchLocalPoints()
@@ -1585,6 +1590,39 @@ void Tracking::ChangeCalibration(const string &strSettingPath)
 void Tracking::InformOnlyTracking(const bool &flag)
 {
     mbOnlyTracking = flag;
+}
+
+unsigned frameCount = 0;
+void Tracking::SavePointCloud()
+{
+    if (frameCount == 0) {
+        frameCount++;
+        return;
+    }
+
+    if (frameCount > 100) {
+        return;
+    }
+
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    pcl::PointXYZ point;
+
+    for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
+        if (mCurrentFrame.mvpMapPoints[i]) {
+            point.x = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(0);
+            point.y = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(1);
+            point.z = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(2);
+        }
+
+        cloud.points.push_back(point);
+    }
+
+    std::stringstream filename;
+    filename << "orb_kf_cloud_" << frameCount << ".pcd";
+    std::string file = filename.str();
+    pcl::io::savePCDFileBinary(file, cloud);
+    std::cout << mCurrentFrame.mTimeStamp << std::endl;
+    frameCount++;
 }
 
 
