@@ -21,4 +21,8 @@ Vocabulary/ORBvoc.txt
 build/
 *~
 lib/
-
+*.ply
+*.pcd
+*.bin
+LidarMono
+**/CameraTrajectory.txt

@@ -37,16 +37,18 @@
 
 #include<mutex>
 
+#include<ICP.hpp>
+
 
 using namespace std;
 
 namespace ORB_SLAM2
 {
 
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
+Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, LidarMono::ICP * icp):
     mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
+    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0), mpICP(icp)
 {
     // Load camera parameters from settings file
 
@@ -235,7 +237,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 }
 
 
-cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
+cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, cv::Mat * groundTruth)
 {
     mImGray = im;
 
@@ -252,6 +254,11 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
             cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
         else
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
+    }
+
+    if (groundTruth != nullptr) {
+        mGroundTruth[1] = mGroundTruth[0];
+        mGroundTruth[0] = *groundTruth;
     }
 
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
@@ -623,11 +630,19 @@ void Tracking::MonocularInitialization()
             }
 
             // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
-            cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
-            Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
-            tcw.copyTo(Tcw.rowRange(0,3).col(3));
-            mCurrentFrame.SetPose(Tcw);
+            if (mGroundTruth[0].empty()) {
+                mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+                cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
+                Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
+                tcw.copyTo(Tcw.rowRange(0, 3).col(3));
+                mCurrentFrame.SetPose(Tcw);
+            }
+
+            // Initialize camera position from the ground truth
+            if (!mGroundTruth[0].empty()) {
+                mInitialFrame.SetPose(mGroundTruth[0]);
+                mCurrentFrame.SetPose(mGroundTruth[1]);
+            }
 
             CreateInitialMapMonocular();
         }
@@ -657,7 +672,12 @@ void Tracking::CreateInitialMapMonocular()
         //Create MapPoint.
         cv::Mat worldPos(mvIniP3D[i]);
 
-        MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpMap);
+        MapPoint *pMP;
+        if (!mGroundTruth[0].empty()) {
+            pMP = new MapPoint(pKFini->GetPose() * worldPos, pKFcur, mpMap);
+        } else {
+            pMP = new MapPoint(worldPos, pKFcur, mpMap);
+        }
 
         pKFini->AddMapPoint(pMP,i);
         pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
@@ -686,29 +706,28 @@ void Tracking::CreateInitialMapMonocular()
     Optimizer::GlobalBundleAdjustemnt(mpMap,20);
 
     // Set median depth to 1
-    float medianDepth = pKFini->ComputeSceneMedianDepth(2);
-    float invMedianDepth = 1.0f/medianDepth;
+    if (mGroundTruth[0].empty()) {
+        float medianDepth = pKFini->ComputeSceneMedianDepth(2);
+        float invMedianDepth = 1.0f / medianDepth;
 
-    if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<100)
-    {
-        cout << "Wrong initialization, reseting..." << endl;
-        Reset();
-        return;
-    }
+        if (medianDepth < 0 || pKFcur->TrackedMapPoints(1) < 100) {
+            cout << "Wrong initialization, reseting..." << endl;
+            Reset();
+            return;
+        }
 
-    // Scale initial baseline
-    cv::Mat Tc2w = pKFcur->GetPose();
-    Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
-    pKFcur->SetPose(Tc2w);
+        // Scale initial baseline
+        cv::Mat Tc2w = pKFcur->GetPose();
+        Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3) * invMedianDepth;
+        pKFcur->SetPose(Tc2w);
 
-    // Scale points
-    vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
-    for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
-    {
-        if(vpAllMapPoints[iMP])
-        {
-            MapPoint* pMP = vpAllMapPoints[iMP];
-            pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
+        // Scale points
+        vector<MapPoint *> vpAllMapPoints = pKFini->GetMapPointMatches();
+        for (size_t iMP = 0; iMP < vpAllMapPoints.size(); iMP++) {
+            if (vpAllMapPoints[iMP]) {
+                MapPoint *pMP = vpAllMapPoints[iMP];
+                pMP->SetWorldPos(pMP->GetWorldPos() * invMedianDepth);
+            }
         }
     }
 
@@ -1138,6 +1157,46 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+
+    if (!mGroundTruth[0].empty()) {
+        // Get the initial pose estimation
+        Eigen::Matrix4f t;
+        cv::Mat pose = pKF->GetPose();
+        for (unsigned i = 0; i < 4; i++) {
+            for (unsigned j = 0; j < 4; j++) {
+                t(i, j) = pose.at<float>(i, j);
+            }
+        }
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+        for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
+            pcl::PointXYZ point;
+            if (mCurrentFrame.mvpMapPoints[i]) {
+                point.x = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(0);
+                point.y = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(1);
+                point.z = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(2);
+            }
+
+            cloud->points.push_back(point);
+        }
+
+        Eigen::Matrix4f transform = mpICP->estimate(t, cloud);
+        t = transform * t.inverse();
+        for (unsigned i = 0; i < 4; i++) {
+            for (unsigned j = 0; j < 4; j++) {
+                pose.at<float>(i, j) = t(i, j);
+            }
+        }
+
+        for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
+            if (mCurrentFrame.mvpMapPoints[i]) {
+                mCurrentFrame.mvpMapPoints[i]->SetWorldPos(
+                    pose * mCurrentFrame.mvpMapPoints[i]->GetWorldPos()
+                );
+            }
+        }
+        pKF->SetPose(pose * pKF->GetPose());
+    }
 }
 
 void Tracking::SearchLocalPoints()

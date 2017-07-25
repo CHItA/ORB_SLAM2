@@ -38,6 +38,8 @@
 #include "MapDrawer.h"
 #include "System.h"
 
+#include <ICP.hpp>
+
 #include <mutex>
 
 namespace ORB_SLAM2
@@ -55,12 +57,12 @@ class Tracking
 
 public:
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
+             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, LidarMono::ICP * icp = nullptr);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
     cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
-    cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
+    cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp, cv::Mat * groundTruth = nullptr);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
@@ -214,6 +216,11 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
+
+    // Ground truth positions
+    cv::Mat mGroundTruth[2];
+
+    LidarMono::ICP * mpICP;
 };
 
 } //namespace ORB_SLAM
