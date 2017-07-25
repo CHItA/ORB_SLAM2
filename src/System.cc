@@ -26,6 +26,10 @@
 #include <pangolin/pangolin.h>
 #include <iomanip>
 
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/ply_io.h>
+
 namespace ORB_SLAM2
 {
 
@@ -467,6 +471,24 @@ void System::SaveTrajectoryKITTI(const string &filename)
              Rwc.at<float>(1,0) << " " << Rwc.at<float>(1,1)  << " " << Rwc.at<float>(1,2) << " "  << twc.at<float>(1) << " " <<
              Rwc.at<float>(2,0) << " " << Rwc.at<float>(2,1)  << " " << Rwc.at<float>(2,2) << " "  << twc.at<float>(2) << endl;
     }
+
+    const vector<MapPoint*> &vpMPs = mpMap->GetAllMapPoints();
+    const vector<MapPoint*> &vpRefMPs = mpMap->GetReferenceMapPoints();
+    set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+
+    for (size_t i=0, iend=vpMPs.size(); i<iend;i++)
+    {
+        if(vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
+            continue;
+
+        cv::Mat pos = vpMPs[i]->GetWorldPos();
+        pcl::PointXYZ p(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
+        cloud.points.push_back(p);
+    }
+
+    pcl::io::savePLYFile("point_cloud.ply", cloud, true);
+
     f.close();
     cout << endl << "trajectory saved!" << endl;
 }
