@@ -148,6 +148,8 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
 
+    mGroundTruth.resize(2);
+    std::cout << "Foobar" << std::endl;
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -239,6 +241,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 
 cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, cv::Mat * groundTruth)
 {
+    std::cout << "Function start" << std::endl;
     mImGray = im;
 
     if(mImGray.channels()==3)
@@ -631,6 +634,7 @@ void Tracking::MonocularInitialization()
 
             // Set Frame Poses
             if (mGroundTruth[0].empty()) {
+                std::cout << "foo, foo." << endl;
                 mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
                 cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
                 Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
@@ -640,6 +644,7 @@ void Tracking::MonocularInitialization()
 
             // Initialize camera position from the ground truth
             if (!mGroundTruth[0].empty()) {
+                cout << "bar, bar" << endl;
                 mInitialFrame.SetPose(mGroundTruth[0]);
                 mCurrentFrame.SetPose(mGroundTruth[1]);
             }
@@ -651,6 +656,7 @@ void Tracking::MonocularInitialization()
 
 void Tracking::CreateInitialMapMonocular()
 {
+    cout << "ini start" << endl;
     // Create KeyFrames
     KeyFrame* pKFini = new KeyFrame(mInitialFrame,mpMap,mpKeyFrameDB);
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
@@ -703,10 +709,13 @@ void Tracking::CreateInitialMapMonocular()
     // Bundle Adjustment
     cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
+    cout << "ini mid" << endl;
+
     Optimizer::GlobalBundleAdjustemnt(mpMap,20);
 
     // Set median depth to 1
     if (mGroundTruth[0].empty()) {
+        cout << "fofofof" << endl;
         float medianDepth = pKFini->ComputeSceneMedianDepth(2);
         float invMedianDepth = 1.0f / medianDepth;
 
@@ -753,6 +762,7 @@ void Tracking::CreateInitialMapMonocular()
     mpMap->mvpKeyFrameOrigins.push_back(pKFini);
 
     mState=OK;
+    cout << "ini end." << endl;
 }
 
 void Tracking::CheckReplacedInLastFrame()

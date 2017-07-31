@@ -218,7 +218,7 @@ protected:
     list<MapPoint*> mlpTemporalPoints;
 
     // Ground truth positions
-    cv::Mat mGroundTruth[2];
+    vector<cv::Mat> mGroundTruth;
 
     LidarMono::ICP * mpICP;
 };
