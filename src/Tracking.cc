@@ -43,11 +43,32 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
+cv::Mat toHomogeneous(cv::Mat const &p)
+{
+    cv::Mat hp(4, 1, CV_32F);
+    hp.at<float>(0) = p.at<float>(0);
+    hp.at<float>(1) = p.at<float>(1);
+    hp.at<float>(2) = p.at<float>(2);
+    hp.at<float>(3) = 1;
+    return hp;
+}
+
+cv::Mat fromHomogeneous(cv::Mat const &p)
+{
+    cv::Mat hp(3, 1, CV_32F);
+    hp.at<float>(0) = p.at<float>(0) / p.at<float>(3);
+    hp.at<float>(1) = p.at<float>(1) / p.at<float>(3);
+    hp.at<float>(2) = p.at<float>(2) / p.at<float>(3);
+    return hp;
+}
+
+Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, LidarMono::ICP * icp):
     mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
+    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0), mpICP(icp), mInitFromGroundTruth(false)
 {
+    mGroundTruth.resize(2);
+
     // Load camera parameters from settings file
 
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
@@ -235,8 +256,14 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 }
 
 
-cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
+cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, cv::Mat * groundTruth)
 {
+    mInitFromGroundTruth = groundTruth != nullptr;
+    if (mInitFromGroundTruth) {
+        mGroundTruth[0] = mGroundTruth[1];
+        mGroundTruth[1] = *groundTruth;
+    }
+
     mImGray = im;
 
     if(mImGray.channels()==3)
@@ -623,11 +650,16 @@ void Tracking::MonocularInitialization()
             }
 
             // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
-            cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
-            Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
-            tcw.copyTo(Tcw.rowRange(0,3).col(3));
-            mCurrentFrame.SetPose(Tcw);
+            if (!mInitFromGroundTruth) {
+                mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+                cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
+                Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
+                tcw.copyTo(Tcw.rowRange(0, 3).col(3));
+                mCurrentFrame.SetPose(Tcw);
+            } else {
+                mInitialFrame.SetPose(mGroundTruth[0]);
+                mCurrentFrame.SetPose(mGroundTruth[1]);
+            }
 
             CreateInitialMapMonocular();
         }
@@ -657,7 +689,12 @@ void Tracking::CreateInitialMapMonocular()
         //Create MapPoint.
         cv::Mat worldPos(mvIniP3D[i]);
 
-        MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpMap);
+        MapPoint* pMP;
+        if (!mInitFromGroundTruth) {
+            pMP = new MapPoint(worldPos,pKFcur,mpMap);
+        } else {
+            pMP = new MapPoint(fromHomogeneous(pKFini->GetPose() * toHomogeneous(worldPos)), pKFcur, mpMap);
+        }
 
         pKFini->AddMapPoint(pMP,i);
         pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
@@ -696,19 +733,19 @@ void Tracking::CreateInitialMapMonocular()
         return;
     }
 
-    // Scale initial baseline
-    cv::Mat Tc2w = pKFcur->GetPose();
-    Tc2w.col(3).rowRange(0,3) = Tc2w.col(3).rowRange(0,3)*invMedianDepth;
-    pKFcur->SetPose(Tc2w);
+    if (!mInitFromGroundTruth) {
+        // Scale initial baseline
+        cv::Mat Tc2w = pKFcur->GetPose();
+        Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3) * invMedianDepth;
+        pKFcur->SetPose(Tc2w);
 
-    // Scale points
-    vector<MapPoint*> vpAllMapPoints = pKFini->GetMapPointMatches();
-    for(size_t iMP=0; iMP<vpAllMapPoints.size(); iMP++)
-    {
-        if(vpAllMapPoints[iMP])
-        {
-            MapPoint* pMP = vpAllMapPoints[iMP];
-            pMP->SetWorldPos(pMP->GetWorldPos()*invMedianDepth);
+        // Scale points
+        vector<MapPoint *> vpAllMapPoints = pKFini->GetMapPointMatches();
+        for (size_t iMP = 0; iMP < vpAllMapPoints.size(); iMP++) {
+            if (vpAllMapPoints[iMP]) {
+                MapPoint *pMP = vpAllMapPoints[iMP];
+                pMP->SetWorldPos(pMP->GetWorldPos() * invMedianDepth);
+            }
         }
     }
 
@@ -1130,6 +1167,48 @@ void Tracking::CreateNewKeyFrame()
                     break;
             }
         }
+    }
+
+    if (mInitFromGroundTruth) {
+        // Get the initial pose estimation
+        Eigen::Matrix4f t;
+        cv::Mat pose = pKF->GetPose();
+        for (unsigned i = 0; i < 4; i++) {
+            for (unsigned j = 0; j < 4; j++) {
+                t(i, j) = pose.at<float>(i, j);
+            }
+        }
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+        for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
+            pcl::PointXYZ point;
+            if (mCurrentFrame.mvpMapPoints[i]) {
+                point.x = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(0);
+                point.y = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(1);
+                point.z = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(2);
+            }
+
+            cloud->points.push_back(point);
+        }
+
+        Eigen::Matrix4f transform = mpICP->estimate(t, cloud);
+        Eigen::Matrix4f t_inv = t.inverse();
+        t = transform * t_inv;
+        for (unsigned i = 0; i < 4; i++) {
+            for (unsigned j = 0; j < 4; j++) {
+                pose.at<float>(i, j) = t(i, j);
+            }
+        }
+
+        for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
+            if (mCurrentFrame.mvpMapPoints[i]) {
+                mCurrentFrame.mvpMapPoints[i]->SetWorldPos(
+                    fromHomogeneous(pose * toHomogeneous(mCurrentFrame.mvpMapPoints[i]->GetWorldPos()))
+                );
+            }
+        }
+
+        pKF->SetPose(pose * pKF->GetPose());
     }
 
     mpLocalMapper->InsertKeyFrame(pKF);

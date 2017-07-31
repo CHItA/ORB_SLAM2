@@ -1,0 +1,13 @@
+# ICP iteration count
+K: 10
+
+# ICP distance thresholds
+tmin: 1
+tmax: 2
+
+# Voxel resolution
+resolution: 1
+
+# Boundary detection
+N: 10
+Nsigma: 3
