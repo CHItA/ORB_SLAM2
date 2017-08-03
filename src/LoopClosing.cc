@@ -399,6 +399,24 @@ bool LoopClosing::ComputeSim3()
 
 }
 
+void LoopClosing::KillGBA()
+{
+    // If a Global Bundle Adjustment is running, abort it
+    if(isRunningGBA())
+    {
+        unique_lock<mutex> lock(mMutexGBA);
+        mbStopGBA = true;
+
+        mnFullBAIdx++;
+
+        if(mpThreadGBA)
+        {
+            mpThreadGBA->detach();
+            delete mpThreadGBA;
+        }
+    }
+}
+
 void LoopClosing::CorrectLoop()
 {
     cout << "Loop detected!" << endl;
@@ -582,6 +600,15 @@ void LoopClosing::CorrectLoop()
     mpLocalMapper->Release();    
 
     mLastLoopKFid = mpCurrentKF->mnId;   
+}
+
+void LoopClosing::StartGBA()
+{
+    // Launch a new thread to perform Global Bundle Adjustment
+    mbRunningGBA = true;
+    mbFinishedGBA = false;
+    mbStopGBA = false;
+    mpThreadGBA = new thread(&LoopClosing::RunGlobalBundleAdjustment,this,mpCurrentKF->mnId);
 }
 
 void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)

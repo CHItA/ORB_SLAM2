@@ -26,9 +26,9 @@
 namespace ORB_SLAM2
 {
 
-Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Tracking *pTracking, const string &strSettingPath):
+Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Tracking *pTracking, const string &strSettingPath, LidarMono::LidarMap * map):
     mpSystem(pSystem), mpFrameDrawer(pFrameDrawer),mpMapDrawer(pMapDrawer), mpTracker(pTracking),
-    mbFinishRequested(false), mbFinished(true), mbStopped(true), mbStopRequested(false)
+    mbFinishRequested(false), mbFinished(true), mbStopped(true), mbStopRequested(false), mLidarMap(map)
 {
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
@@ -75,7 +75,7 @@ void Viewer::Run()
 
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
-                pangolin::ProjectionMatrix(1024,768,mViewpointF,mViewpointF,512,389,0.1,1000),
+                pangolin::ProjectionMatrix(1024,768,mViewpointF,mViewpointF,512,389,0.1,10000),
                 pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0)
                 );
 
@@ -126,6 +126,53 @@ void Viewer::Run()
 
         d_cam.Activate(s_cam);
         glClearColor(1.0f,1.0f,1.0f,1.0f);
+
+        if (mLidarMap != nullptr) {
+            glPointSize(2);
+            glBegin(GL_POINTS);
+            glColor3f(0.0,1.0,0.0);
+            for (auto p: mLidarMap->getPointCloudPointer()->points) {
+                glVertex3f(p.x, p.y, p.z);
+            }
+
+            glEnd();
+
+            glColor4f(1.0f,0.0f,0.0f,0.6f);
+            const float w = 1.5f;
+            const float h = w * 0.75f;
+            const float z = w * 0.6f;
+            glPushMatrix();
+
+            glMultMatrixf((mpTracker->getGroundTruth()).ptr<GLfloat>(0));
+
+            glLineWidth(1.0f);
+            glColor3f(0.0f,0.0f,1.0f);
+            glBegin(GL_LINES);
+            glVertex3f(0,0,0);
+            glVertex3f(w,h,z);
+            glVertex3f(0,0,0);
+            glVertex3f(w,-h,z);
+            glVertex3f(0,0,0);
+            glVertex3f(-w,-h,z);
+            glVertex3f(0,0,0);
+            glVertex3f(-w,h,z);
+
+            glVertex3f(w,h,z);
+            glVertex3f(w,-h,z);
+
+            glVertex3f(-w,h,z);
+            glVertex3f(-w,-h,z);
+
+            glVertex3f(-w,h,z);
+            glVertex3f(w,h,z);
+
+            glVertex3f(-w,-h,z);
+            glVertex3f(w,-h,z);
+            glEnd();
+
+            glPopMatrix();
+        }
+
         mpMapDrawer->DrawCurrentCamera(Twc);
         if(menuShowKeyFrames || menuShowGraph)
             mpMapDrawer->DrawKeyFrames(menuShowKeyFrames,menuShowGraph);

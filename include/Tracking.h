@@ -76,6 +76,8 @@ public:
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
 
+    cv::Mat getGroundTruth() { return (mGroundTruth[0]); }
+
 
 public:
 

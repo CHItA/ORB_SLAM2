@@ -80,6 +80,10 @@ public:
 
     bool isFinished();
 
+    void KillGBA();
+
+    void StartGBA();
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 protected:

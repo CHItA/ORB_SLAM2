@@ -1099,8 +1099,18 @@ bool Tracking::NeedNewKeyFrame()
 
 void Tracking::CreateNewKeyFrame()
 {
-    if(!mpLocalMapper->SetNotStop(true))
-        return;
+    if (!mInitFromGroundTruth) {
+        if (!mpLocalMapper->SetNotStop(true)) {
+            return;
+        }
+    } else {
+        mpLocalMapper->RequestStop();
+        //mpLoopClosing->KillGBA();
+
+        while (!mpLocalMapper->isStopped()) {
+            usleep(1000);
+        }
+    }
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
 
@@ -1171,6 +1181,7 @@ void Tracking::CreateNewKeyFrame()
 
     if (mInitFromGroundTruth) {
         // Get the initial pose estimation
+#if 0
         Eigen::Matrix4f t;
         cv::Mat pose = pKF->GetPose();
         for (unsigned i = 0; i < 4; i++) {
@@ -1205,10 +1216,17 @@ void Tracking::CreateNewKeyFrame()
                 mCurrentFrame.mvpMapPoints[i]->SetWorldPos(
                     fromHomogeneous(pose * toHomogeneous(mCurrentFrame.mvpMapPoints[i]->GetWorldPos()))
                 );
+                mCurrentFrame.mvpMapPoints[i]->UpdateNormalAndDepth();
             }
         }
 
         pKF->SetPose(pose * pKF->GetPose());
+        //mpLoopClosing->StartGBA();
+#endif
+        mpLocalMapper->Release();
+        if (!mpLocalMapper->SetNotStop(true)) {
+            return;
+        }
     }
 
     mpLocalMapper->InsertKeyFrame(pKF);

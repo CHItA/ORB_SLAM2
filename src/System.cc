@@ -26,11 +26,15 @@
 #include <pangolin/pangolin.h>
 #include <iomanip>
 
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/ply_io.h>
+
 namespace ORB_SLAM2
 {
 
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer, LidarMono::ICP * icp):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
+               const bool bUseViewer, LidarMono::ICP * icp, LidarMono::LidarMap * map):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
         mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
@@ -97,7 +101,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //Initialize the Viewer thread and launch
     if(bUseViewer)
     {
-        mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
+        mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile, map);
         mptViewer = new thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
     }
@@ -375,6 +379,24 @@ void System::SaveTrajectoryTUM(const string &filename)
 
         f << setprecision(6) << *lT << " " <<  setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
     }
+
+    const vector<MapPoint*> &vpMPs = mpMap->GetAllMapPoints();
+    const vector<MapPoint*> &vpRefMPs = mpMap->GetReferenceMapPoints();
+    set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+
+    for (size_t i=0, iend=vpMPs.size(); i<iend;i++)
+    {
+        if(vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
+            continue;
+
+        cv::Mat pos = vpMPs[i]->GetWorldPos();
+        pcl::PointXYZ p(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
+        cloud.points.push_back(p);
+    }
+
+    pcl::io::savePLYFile("point_cloud.ply", cloud, true);
+
     f.close();
     cout << endl << "trajectory saved!" << endl;
 }
@@ -414,6 +436,23 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 
     f.close();
     cout << endl << "trajectory saved!" << endl;
+
+    const vector<MapPoint*> &vpMPs = mpMap->GetAllMapPoints();
+    const vector<MapPoint*> &vpRefMPs = mpMap->GetReferenceMapPoints();
+    set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+
+    for (size_t i=0, iend=vpMPs.size(); i<iend;i++)
+    {
+        if(vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
+            continue;
+
+        cv::Mat pos = vpMPs[i]->GetWorldPos();
+        pcl::PointXYZ p(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
+        cloud.points.push_back(p);
+    }
+
+    pcl::io::savePLYFile("point_cloud.ply", cloud, true);
 }
 
 void System::SaveTrajectoryKITTI(const string &filename)
@@ -467,6 +506,24 @@ void System::SaveTrajectoryKITTI(const string &filename)
              Rwc.at<float>(1,0) << " " << Rwc.at<float>(1,1)  << " " << Rwc.at<float>(1,2) << " "  << twc.at<float>(1) << " " <<
              Rwc.at<float>(2,0) << " " << Rwc.at<float>(2,1)  << " " << Rwc.at<float>(2,2) << " "  << twc.at<float>(2) << endl;
     }
+
+    const vector<MapPoint*> &vpMPs = mpMap->GetAllMapPoints();
+    const vector<MapPoint*> &vpRefMPs = mpMap->GetReferenceMapPoints();
+    set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+
+    for (size_t i=0, iend=vpMPs.size(); i<iend;i++)
+    {
+        if(vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
+            continue;
+
+        cv::Mat pos = vpMPs[i]->GetWorldPos();
+        pcl::PointXYZ p(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
+        cloud.points.push_back(p);
+    }
+
+    pcl::io::savePLYFile("point_cloud.ply", cloud, true);
+
     f.close();
     cout << endl << "trajectory saved!" << endl;
 }

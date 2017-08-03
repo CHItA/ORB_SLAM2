@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     LoadGroundTruth(groundTruth);
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, true, &icp);
+    ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::MONOCULAR, true, &icp, &lidar_map);
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -122,6 +122,8 @@ int main(int argc, char **argv)
             usleep((T-ttrack)*1e6);
     }
 
+    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+
     // Stop all threads
     SLAM.Shutdown();
 
@@ -135,9 +137,6 @@ int main(int argc, char **argv)
     cout << "-------" << endl << endl;
     cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
     cout << "mean tracking time: " << totaltime/nImages << endl;
-
-    // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
     return 0;
 }
@@ -207,7 +206,7 @@ void LoadGroundTruth(vector<cv::Mat> &groundTruthVec)
             pose.at<float>(3, 1) = 0;
             pose.at<float>(3, 2) = 0;
             pose.at<float>(3, 3) = 1;
-            groundTruthVec.push_back(pose);
+            groundTruthVec.push_back(pose.t());
         }
     }
 }
