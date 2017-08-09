@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 
     cout << "Loading voxel map (map.bin)..." << endl << endl;
     lidar_map.loadMap("map.bin");
-    LidarMono::ICP icp(lidar_map, caselitz_settings);
+    LidarMono::ICP icp(&lidar_map, caselitz_settings);
 
     // Loading ground truth data for initialization...
     vector<cv::Mat> groundTruth;
@@ -206,7 +206,7 @@ void LoadGroundTruth(vector<cv::Mat> &groundTruthVec)
             pose.at<float>(3, 1) = 0;
             pose.at<float>(3, 2) = 0;
             pose.at<float>(3, 3) = 1;
-            groundTruthVec.push_back(pose.t());
+            groundTruthVec.push_back(pose);
         }
     }
 }

@@ -650,16 +650,11 @@ void Tracking::MonocularInitialization()
             }
 
             // Set Frame Poses
-            if (!mInitFromGroundTruth) {
-                mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
-                cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
-                Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
-                tcw.copyTo(Tcw.rowRange(0, 3).col(3));
-                mCurrentFrame.SetPose(Tcw);
-            } else {
-                mInitialFrame.SetPose(mGroundTruth[0]);
-                mCurrentFrame.SetPose(mGroundTruth[1]);
-            }
+            mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+            cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
+            Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
+            tcw.copyTo(Tcw.rowRange(0, 3).col(3));
+            mCurrentFrame.SetPose(Tcw);
 
             CreateInitialMapMonocular();
         }
@@ -690,11 +685,7 @@ void Tracking::CreateInitialMapMonocular()
         cv::Mat worldPos(mvIniP3D[i]);
 
         MapPoint* pMP;
-        if (!mInitFromGroundTruth) {
-            pMP = new MapPoint(worldPos,pKFcur,mpMap);
-        } else {
-            pMP = new MapPoint(fromHomogeneous(pKFini->GetPose() * toHomogeneous(worldPos)), pKFcur, mpMap);
-        }
+        pMP = new MapPoint(worldPos,pKFcur,mpMap);
 
         pKFini->AddMapPoint(pMP,i);
         pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
@@ -733,18 +724,33 @@ void Tracking::CreateInitialMapMonocular()
         return;
     }
 
-    if (!mInitFromGroundTruth) {
-        // Scale initial baseline
-        cv::Mat Tc2w = pKFcur->GetPose();
-        Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3) * invMedianDepth;
-        pKFcur->SetPose(Tc2w);
+    // Scale initial baseline
+    cv::Mat Tc2w = pKFcur->GetPose();
+    float scale = invMedianDepth;
+    if (mInitFromGroundTruth) {
+        scale  = static_cast<float>(cv::norm(mGroundTruth[1].col(3).rowRange(0,3) - mGroundTruth[0].col(3).rowRange(0,3)));
+        scale /= static_cast<float>(cv::norm(Tc2w.col(3).rowRange(0,3)));
+    }
+    Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3) * scale;
+    pKFcur->SetPose(Tc2w);
 
-        // Scale points
-        vector<MapPoint *> vpAllMapPoints = pKFini->GetMapPointMatches();
-        for (size_t iMP = 0; iMP < vpAllMapPoints.size(); iMP++) {
-            if (vpAllMapPoints[iMP]) {
-                MapPoint *pMP = vpAllMapPoints[iMP];
-                pMP->SetWorldPos(pMP->GetWorldPos() * invMedianDepth);
+    if (mInitFromGroundTruth) {
+        pKFini->SetPose(pKFini->GetPose() * mGroundTruth[0]);
+        pKFcur->SetPose(pKFcur->GetPose() * mGroundTruth[0]);
+    }
+
+    // Scale points
+    vector<MapPoint *> vpAllMapPoints = pKFini->GetMapPointMatches();
+    for (size_t iMP = 0; iMP < vpAllMapPoints.size(); iMP++) {
+        if (vpAllMapPoints[iMP]) {
+            MapPoint *pMP = vpAllMapPoints[iMP];
+            pMP->SetWorldPos(pMP->GetWorldPos() * scale);
+
+            if(mInitFromGroundTruth) {
+                cv::Mat initTwc = mGroundTruth[0].inv();
+                cv::Mat initRwc = initTwc.rowRange(0,3).colRange(0,3);
+                cv::Mat inittwc = initTwc.rowRange(0,3).col(3);
+                pMP->SetWorldPos(initRwc * pMP->GetWorldPos() + inittwc);
             }
         }
     }
@@ -1099,17 +1105,8 @@ bool Tracking::NeedNewKeyFrame()
 
 void Tracking::CreateNewKeyFrame()
 {
-    if (!mInitFromGroundTruth) {
-        if (!mpLocalMapper->SetNotStop(true)) {
-            return;
-        }
-    } else {
-        mpLocalMapper->RequestStop();
-        //mpLoopClosing->KillGBA();
-
-        while (!mpLocalMapper->isStopped()) {
-            usleep(1000);
-        }
+    if (!mpLocalMapper->SetNotStop(true)) {
+        return;
     }
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
@@ -1176,56 +1173,6 @@ void Tracking::CreateNewKeyFrame()
                 if(vDepthIdx[j].first>mThDepth && nPoints>100)
                     break;
             }
-        }
-    }
-
-    if (mInitFromGroundTruth) {
-        // Get the initial pose estimation
-#if 0
-        Eigen::Matrix4f t;
-        cv::Mat pose = pKF->GetPose();
-        for (unsigned i = 0; i < 4; i++) {
-            for (unsigned j = 0; j < 4; j++) {
-                t(i, j) = pose.at<float>(i, j);
-            }
-        }
-
-        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
-        for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
-            pcl::PointXYZ point;
-            if (mCurrentFrame.mvpMapPoints[i]) {
-                point.x = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(0);
-                point.y = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(1);
-                point.z = mCurrentFrame.mvpMapPoints[i]->GetWorldPos().at<float>(2);
-            }
-
-            cloud->points.push_back(point);
-        }
-
-        Eigen::Matrix4f transform = mpICP->estimate(t, cloud);
-        Eigen::Matrix4f t_inv = t.inverse();
-        t = transform * t_inv;
-        for (unsigned i = 0; i < 4; i++) {
-            for (unsigned j = 0; j < 4; j++) {
-                pose.at<float>(i, j) = t(i, j);
-            }
-        }
-
-        for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
-            if (mCurrentFrame.mvpMapPoints[i]) {
-                mCurrentFrame.mvpMapPoints[i]->SetWorldPos(
-                    fromHomogeneous(pose * toHomogeneous(mCurrentFrame.mvpMapPoints[i]->GetWorldPos()))
-                );
-                mCurrentFrame.mvpMapPoints[i]->UpdateNormalAndDepth();
-            }
-        }
-
-        pKF->SetPose(pose * pKF->GetPose());
-        //mpLoopClosing->StartGBA();
-#endif
-        mpLocalMapper->Release();
-        if (!mpLocalMapper->SetNotStop(true)) {
-            return;
         }
     }
 

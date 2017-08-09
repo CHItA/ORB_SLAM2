@@ -143,7 +143,8 @@ void Viewer::Run()
             const float z = w * 0.6f;
             glPushMatrix();
 
-            glMultMatrixf((mpTracker->getGroundTruth()).ptr<GLfloat>(0));
+            cv::Mat gfPose = mpTracker->getGroundTruth().t();
+            glMultMatrixf(gfPose.ptr<GLfloat>(0));
 
             glLineWidth(1.0f);
             glColor3f(0.0f,0.0f,1.0f);
