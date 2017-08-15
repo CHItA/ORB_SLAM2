@@ -27,6 +27,7 @@
 #include<opencv2/core/core.hpp>
 
 #include <ICP.hpp>
+#include <g2oICP.hpp>
 #include <LidarMap.hpp>
 
 #include "Tracking.h"
@@ -38,6 +39,12 @@
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
 #include "Viewer.h"
+
+#if 1
+typedef LidarMono::ICP ICPAlg;
+#else
+typedef LidarMono::g2oICP ICPAlg;
+#endif
 
 namespace ORB_SLAM2
 {
@@ -62,7 +69,7 @@ public:
 public:
 
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
-    System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer = true, LidarMono::ICP * icp = nullptr, LidarMono::LidarMap * map = nullptr);
+    System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer = true, ICPAlg * icp = nullptr, LidarMono::LidarMap * map = nullptr);
 
     // Proccess the given stereo frame. Images must be synchronized and rectified.
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.

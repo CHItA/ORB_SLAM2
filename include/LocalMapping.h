@@ -29,6 +29,13 @@
 
 #include <mutex>
 #include <ICP.hpp>
+#include <LidarMono/include/g2oICP.hpp>
+
+#if 1
+typedef LidarMono::ICP ICPAlg;
+#else
+typedef LidarMono::g2oICP ICPAlg;
+#endif
 
 namespace ORB_SLAM2
 {
@@ -40,7 +47,7 @@ class Map;
 class LocalMapping
 {
 public:
-    LocalMapping(Map* pMap, const float bMonocular, LidarMono::ICP * icp = nullptr);
+    LocalMapping(Map* pMap, const float bMonocular, ICPAlg * icp = nullptr);
 
     void SetLoopCloser(LoopClosing* pLoopCloser);
 
@@ -122,7 +129,7 @@ protected:
     bool mbAcceptKeyFrames;
     std::mutex mMutexAccept;
 
-    LidarMono::ICP * mpICP;
+    ICPAlg * mpICP;
 };
 
 } //namespace ORB_SLAM

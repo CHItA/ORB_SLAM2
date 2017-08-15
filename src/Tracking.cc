@@ -43,29 +43,10 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-cv::Mat toHomogeneous(cv::Mat const &p)
-{
-    cv::Mat hp(4, 1, CV_32F);
-    hp.at<float>(0) = p.at<float>(0);
-    hp.at<float>(1) = p.at<float>(1);
-    hp.at<float>(2) = p.at<float>(2);
-    hp.at<float>(3) = 1;
-    return hp;
-}
-
-cv::Mat fromHomogeneous(cv::Mat const &p)
-{
-    cv::Mat hp(3, 1, CV_32F);
-    hp.at<float>(0) = p.at<float>(0) / p.at<float>(3);
-    hp.at<float>(1) = p.at<float>(1) / p.at<float>(3);
-    hp.at<float>(2) = p.at<float>(2) / p.at<float>(3);
-    return hp;
-}
-
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, LidarMono::ICP * icp):
+Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
     mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0), mpICP(icp), mInitFromGroundTruth(false)
+    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0), mInitFromGroundTruth(false)
 {
     mGroundTruth.resize(2);
 
@@ -747,7 +728,7 @@ void Tracking::CreateInitialMapMonocular()
             pMP->SetWorldPos(pMP->GetWorldPos() * scale);
 
             if(mInitFromGroundTruth) {
-                cv::Mat initTwc = mGroundTruth[0].inv();
+                cv::Mat initTwc = mGroundTruth[0];
                 cv::Mat initRwc = initTwc.rowRange(0,3).colRange(0,3);
                 cv::Mat inittwc = initTwc.rowRange(0,3).col(3);
                 pMP->SetWorldPos(initRwc * pMP->GetWorldPos() + inittwc);

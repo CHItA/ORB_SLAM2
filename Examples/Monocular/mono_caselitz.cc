@@ -61,7 +61,11 @@ int main(int argc, char **argv)
 
     cout << "Loading voxel map (map.bin)..." << endl << endl;
     lidar_map.loadMap("map.bin");
+#if 1
     LidarMono::ICP icp(&lidar_map, caselitz_settings);
+#else
+    LidarMono::g2oICP icp(&lidar_map, caselitz_settings);
+#endif
 
     // Loading ground truth data for initialization...
     vector<cv::Mat> groundTruth;
