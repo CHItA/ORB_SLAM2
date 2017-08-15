@@ -25,12 +25,15 @@
 
 #include<mutex>
 
+#include <Eigen/Dense>
+#include<opencv2/core/core.hpp>
+
 namespace ORB_SLAM2
 {
 
-LocalMapping::LocalMapping(Map *pMap, const float bMonocular):
+LocalMapping::LocalMapping(Map *pMap, const float bMonocular, LidarMono::ICP * icp):
     mbMonocular(bMonocular), mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
-    mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false), mbAcceptKeyFrames(true)
+    mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false), mbAcceptKeyFrames(true), mpICP(icp)
 {
 }
 
@@ -131,6 +134,50 @@ void LocalMapping::ProcessNewKeyFrame()
         unique_lock<mutex> lock(mMutexNewKFs);
         mpCurrentKeyFrame = mlNewKeyFrames.front();
         mlNewKeyFrames.pop_front();
+    }
+
+    // Check whether or not to use ICP
+    if (mpICP != nullptr) {
+        // Get original pose estimation
+        Eigen::Matrix4f t;
+        cv::Mat pose = mpCurrentKeyFrame->GetPose();
+        for (unsigned row = 0; row < 4; row++) {
+            for (unsigned col = 0; col < 4; col++) {
+                t(row, col) = pose.at<float>(row, col);
+            }
+        }
+
+        // Get keyframe's point cloud
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>());
+        for (auto mapPointPtr: mpCurrentKeyFrame->GetMapPoints()) {
+            pcl::PointXYZ point;
+            if (mapPointPtr != nullptr) {
+                point.x = mapPointPtr->GetWorldPos().at<float>(0);
+                point.y = mapPointPtr->GetWorldPos().at<float>(1);
+                point.z = mapPointPtr->GetWorldPos().at<float>(2);
+                cloud->points.push_back(point);
+            }
+        }
+
+        /*for (size_t i = 0, total = mCurrentFrame.mvpMapPoints.size(); i < total; i++) {
+        if (mCurrentFrame.mvpMapPoints[i]) {
+            mCurrentFrame.mvpMapPoints[i]->SetWorldPos(
+                fromHomogeneous(pose * toHomogeneous(mCurrentFrame.mvpMapPoints[i]->GetWorldPos()))
+            );
+        }*/
+
+        // Calculate the difference between the two transformations
+        Eigen::Matrix4f transform = mpICP->estimate(t, cloud);
+        Eigen::Matrix4f originalTransformInverse = t.inverse();
+        t = transform * originalTransformInverse;
+        for (unsigned row = 0; row < 4; row++) {
+            for (unsigned col = 0; col < 4; col++) {
+                pose.at<float>(row, col) = t(row, col);
+            }
+        }
+
+        // Update keyframe pose
+        mpCurrentKeyFrame->SetPose(pose * mpCurrentKeyFrame->GetPose());
     }
 
     // Compute Bags of Words structures

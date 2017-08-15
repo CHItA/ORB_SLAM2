@@ -28,7 +28,7 @@
 #include "KeyFrameDatabase.h"
 
 #include <mutex>
-
+#include <ICP.hpp>
 
 namespace ORB_SLAM2
 {
@@ -40,7 +40,7 @@ class Map;
 class LocalMapping
 {
 public:
-    LocalMapping(Map* pMap, const float bMonocular);
+    LocalMapping(Map* pMap, const float bMonocular, LidarMono::ICP * icp = nullptr);
 
     void SetLoopCloser(LoopClosing* pLoopCloser);
 
@@ -121,6 +121,8 @@ protected:
 
     bool mbAcceptKeyFrames;
     std::mutex mMutexAccept;
+
+    LidarMono::ICP * mpICP;
 };
 
 } //namespace ORB_SLAM

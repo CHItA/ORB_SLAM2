@@ -728,15 +728,15 @@ void Tracking::CreateInitialMapMonocular()
     cv::Mat Tc2w = pKFcur->GetPose();
     float scale = invMedianDepth;
     if (mInitFromGroundTruth) {
-        scale  = static_cast<float>(cv::norm(mGroundTruth[1].col(3).rowRange(0,3) - mGroundTruth[0].col(3).rowRange(0,3)));
+        scale  = 1.0f; //static_cast<float>(cv::norm(mGroundTruth[1].col(3).rowRange(0,3) - mGroundTruth[0].col(3).rowRange(0,3)));
         scale /= static_cast<float>(cv::norm(Tc2w.col(3).rowRange(0,3)));
     }
     Tc2w.col(3).rowRange(0, 3) = Tc2w.col(3).rowRange(0, 3) * scale;
     pKFcur->SetPose(Tc2w);
 
     if (mInitFromGroundTruth) {
-        pKFini->SetPose(pKFini->GetPose() * mGroundTruth[0]);
-        pKFcur->SetPose(pKFcur->GetPose() * mGroundTruth[0]);
+        pKFini->SetPose(pKFini->GetPose() * mGroundTruth[0].inv());
+        pKFcur->SetPose(pKFcur->GetPose() * mGroundTruth[0].inv());
     }
 
     // Scale points
@@ -1631,6 +1631,8 @@ void Tracking::InformOnlyTracking(const bool &flag)
     mbOnlyTracking = flag;
 }
 
-
+cv::Mat Tracking::getGroundTruth() const {
+    return mGroundTruth[1];
+}
 
 } //namespace ORB_SLAM

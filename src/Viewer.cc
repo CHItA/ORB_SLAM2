@@ -130,7 +130,7 @@ void Viewer::Run()
         if (mLidarMap != nullptr) {
             glPointSize(2);
             glBegin(GL_POINTS);
-            glColor3f(0.0,1.0,0.0);
+            glColor3f(0.941f, 0.902f, 0.549f);
             for (auto p: mLidarMap->getPointCloudPointer()->points) {
                 glVertex3f(p.x, p.y, p.z);
             }
