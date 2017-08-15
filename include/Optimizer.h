@@ -27,7 +27,7 @@
 #include "LoopClosing.h"
 #include "Frame.h"
 
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include "Thirdparty/orb_g2o/orb_g2o/types/types_seven_dof_expmap.h"
 
 namespace ORB_SLAM2
 {
@@ -54,7 +54,7 @@ public:
 
     // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)
     static int OptimizeSim3(KeyFrame* pKF1, KeyFrame* pKF2, std::vector<MapPoint *> &vpMatches1,
-                            g2o::Sim3 &g2oS12, const float th2, const bool bFixScale);
+                            orb_g2o::Sim3 &orb_g2oS12, const float th2, const bool bFixScale);
 };
 
 } //namespace ORB_SLAM

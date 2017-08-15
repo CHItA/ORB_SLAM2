@@ -31,7 +31,7 @@
 
 #include <thread>
 #include <mutex>
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include "Thirdparty/orb_g2o/orb_g2o/types/types_seven_dof_expmap.h"
 
 namespace ORB_SLAM2
 {
@@ -46,8 +46,8 @@ class LoopClosing
 public:
 
     typedef pair<set<KeyFrame*>,int> ConsistentGroup;    
-    typedef map<KeyFrame*,g2o::Sim3,std::less<KeyFrame*>,
-        Eigen::aligned_allocator<std::pair<const KeyFrame*, g2o::Sim3> > > KeyFrameAndPose;
+    typedef map<KeyFrame*,orb_g2o::Sim3,std::less<KeyFrame*>,
+        Eigen::aligned_allocator<std::pair<const KeyFrame*, orb_g2o::Sim3> > > KeyFrameAndPose;
 
 public:
 
@@ -132,7 +132,7 @@ protected:
     std::vector<MapPoint*> mvpCurrentMatchedPoints;
     std::vector<MapPoint*> mvpLoopMapPoints;
     cv::Mat mScw;
-    g2o::Sim3 mg2oScw;
+    orb_g2o::Sim3 morb_g2oScw;
 
     long unsigned int mLastLoopKFid;
 

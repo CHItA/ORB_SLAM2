@@ -24,8 +24,8 @@
 #include<opencv2/core/core.hpp>
 
 #include<Eigen/Dense>
-#include"Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
-#include"Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include"Thirdparty/orb_g2o/orb_g2o/types/types_six_dof_expmap.h"
+#include"Thirdparty/orb_g2o/orb_g2o/types/types_seven_dof_expmap.h"
 
 namespace ORB_SLAM2
 {
@@ -35,11 +35,11 @@ class Converter
 public:
     static std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
-    static g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
-    static g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
+    static orb_g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
+    static orb_g2o::SE3Quat toSE3Quat(const orb_g2o::Sim3 &gSim3);
 
-    static cv::Mat toCvMat(const g2o::SE3Quat &SE3);
-    static cv::Mat toCvMat(const g2o::Sim3 &Sim3);
+    static cv::Mat toCvMat(const orb_g2o::SE3Quat &SE3);
+    static cv::Mat toCvMat(const orb_g2o::Sim3 &Sim3);
     static cv::Mat toCvMat(const Eigen::Matrix<double,4,4> &m);
     static cv::Mat toCvMat(const Eigen::Matrix3d &m);
     static cv::Mat toCvMat(const Eigen::Matrix<double,3,1> &m);

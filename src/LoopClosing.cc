@@ -322,7 +322,7 @@ bool LoopClosing::ComputeSim3()
                 const float s = pSolver->GetEstimatedScale();
                 matcher.SearchBySim3(mpCurrentKF,pKF,vpMapPointMatches,s,R,t,7.5);
 
-                g2o::Sim3 gScm(Converter::toMatrix3d(R),Converter::toVector3d(t),s);
+                orb_g2o::Sim3 gScm(Converter::toMatrix3d(R),Converter::toVector3d(t),s);
                 const int nInliers = Optimizer::OptimizeSim3(mpCurrentKF, pKF, vpMapPointMatches, gScm, 10, mbFixScale);
 
                 // If optimization is succesful stop ransacs and continue
@@ -330,9 +330,9 @@ bool LoopClosing::ComputeSim3()
                 {
                     bMatch = true;
                     mpMatchedKF = pKF;
-                    g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()),Converter::toVector3d(pKF->GetTranslation()),1.0);
-                    mg2oScw = gScm*gSmw;
-                    mScw = Converter::toCvMat(mg2oScw);
+                    orb_g2o::Sim3 gSmw(Converter::toMatrix3d(pKF->GetRotation()),Converter::toVector3d(pKF->GetTranslation()),1.0);
+                    morb_g2oScw = gScm*gSmw;
+                    mScw = Converter::toCvMat(morb_g2oScw);
 
                     mvpCurrentMatchedPoints = vpMapPointMatches;
                     break;
@@ -454,7 +454,7 @@ void LoopClosing::CorrectLoop()
     mvpCurrentConnectedKFs.push_back(mpCurrentKF);
 
     KeyFrameAndPose CorrectedSim3, NonCorrectedSim3;
-    CorrectedSim3[mpCurrentKF]=mg2oScw;
+    CorrectedSim3[mpCurrentKF]=morb_g2oScw;
     cv::Mat Twc = mpCurrentKF->GetPoseInverse();
 
 
@@ -473,27 +473,27 @@ void LoopClosing::CorrectLoop()
                 cv::Mat Tic = Tiw*Twc;
                 cv::Mat Ric = Tic.rowRange(0,3).colRange(0,3);
                 cv::Mat tic = Tic.rowRange(0,3).col(3);
-                g2o::Sim3 g2oSic(Converter::toMatrix3d(Ric),Converter::toVector3d(tic),1.0);
-                g2o::Sim3 g2oCorrectedSiw = g2oSic*mg2oScw;
+                orb_g2o::Sim3 orb_g2oSic(Converter::toMatrix3d(Ric),Converter::toVector3d(tic),1.0);
+                orb_g2o::Sim3 orb_g2oCorrectedSiw = orb_g2oSic*morb_g2oScw;
                 //Pose corrected with the Sim3 of the loop closure
-                CorrectedSim3[pKFi]=g2oCorrectedSiw;
+                CorrectedSim3[pKFi]=orb_g2oCorrectedSiw;
             }
 
             cv::Mat Riw = Tiw.rowRange(0,3).colRange(0,3);
             cv::Mat tiw = Tiw.rowRange(0,3).col(3);
-            g2o::Sim3 g2oSiw(Converter::toMatrix3d(Riw),Converter::toVector3d(tiw),1.0);
+            orb_g2o::Sim3 orb_g2oSiw(Converter::toMatrix3d(Riw),Converter::toVector3d(tiw),1.0);
             //Pose without correction
-            NonCorrectedSim3[pKFi]=g2oSiw;
+            NonCorrectedSim3[pKFi]=orb_g2oSiw;
         }
 
         // Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
         for(KeyFrameAndPose::iterator mit=CorrectedSim3.begin(), mend=CorrectedSim3.end(); mit!=mend; mit++)
         {
             KeyFrame* pKFi = mit->first;
-            g2o::Sim3 g2oCorrectedSiw = mit->second;
-            g2o::Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
+            orb_g2o::Sim3 orb_g2oCorrectedSiw = mit->second;
+            orb_g2o::Sim3 orb_g2oCorrectedSwi = orb_g2oCorrectedSiw.inverse();
 
-            g2o::Sim3 g2oSiw =NonCorrectedSim3[pKFi];
+            orb_g2o::Sim3 orb_g2oSiw =NonCorrectedSim3[pKFi];
 
             vector<MapPoint*> vpMPsi = pKFi->GetMapPointMatches();
             for(size_t iMP=0, endMPi = vpMPsi.size(); iMP<endMPi; iMP++)
@@ -509,7 +509,7 @@ void LoopClosing::CorrectLoop()
                 // Project with non-corrected pose and project back with corrected pose
                 cv::Mat P3Dw = pMPi->GetWorldPos();
                 Eigen::Matrix<double,3,1> eigP3Dw = Converter::toVector3d(P3Dw);
-                Eigen::Matrix<double,3,1> eigCorrectedP3Dw = g2oCorrectedSwi.map(g2oSiw.map(eigP3Dw));
+                Eigen::Matrix<double,3,1> eigCorrectedP3Dw = orb_g2oCorrectedSwi.map(orb_g2oSiw.map(eigP3Dw));
 
                 cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigCorrectedP3Dw);
                 pMPi->SetWorldPos(cvCorrectedP3Dw);
@@ -519,9 +519,9 @@ void LoopClosing::CorrectLoop()
             }
 
             // Update keyframe pose with corrected Sim3. First transform Sim3 to SE3 (scale translation)
-            Eigen::Matrix3d eigR = g2oCorrectedSiw.rotation().toRotationMatrix();
-            Eigen::Vector3d eigt = g2oCorrectedSiw.translation();
-            double s = g2oCorrectedSiw.scale();
+            Eigen::Matrix3d eigR = orb_g2oCorrectedSiw.rotation().toRotationMatrix();
+            Eigen::Vector3d eigt = orb_g2oCorrectedSiw.translation();
+            double s = orb_g2oCorrectedSiw.scale();
 
             eigt *=(1./s); //[R t/s;0 1]
 
@@ -619,8 +619,8 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
     {
         KeyFrame* pKF = mit->first;
 
-        g2o::Sim3 g2oScw = mit->second;
-        cv::Mat cvScw = Converter::toCvMat(g2oScw);
+        orb_g2o::Sim3 orb_g2oScw = mit->second;
+        cv::Mat cvScw = Converter::toCvMat(orb_g2oScw);
 
         vector<MapPoint*> vpReplacePoints(mvpLoopMapPoints.size(),static_cast<MapPoint*>(NULL));
         matcher.Fuse(pKF,cvScw,mvpLoopMapPoints,4,vpReplacePoints);

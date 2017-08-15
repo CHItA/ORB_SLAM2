@@ -82,7 +82,7 @@ ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
-${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
+${PROJECT_SOURCE_DIR}/Thirdparty/orb_g2o/lib/liborb_g2o.so
 ${PCL_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/LidarMono/build/libLidarMono.so
 )
